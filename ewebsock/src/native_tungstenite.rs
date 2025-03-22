@@ -77,7 +77,17 @@ pub fn ws_receiver_blocking(url: &str, options: Options, on_event: &EventHandler
     let uri: tungstenite::http::Uri = url
         .parse()
         .map_err(|err| format!("Failed to parse URL {url:?}: {err}"))?;
-    let config = tungstenite::protocol::WebSocketConfig::from(options.clone());
+
+    let config = tungstenite::protocol::WebSocketConfig::default();
+    let max_incoming_frame_size = options.max_incoming_frame_size;
+    let max_frame_size = if max_incoming_frame_size == usize::MAX {
+        None
+    } else {
+        Some(max_incoming_frame_size)
+    };
+
+    config.max_frame_size(max_frame_size);
+    
     let max_redirects = 3; // tungstenite default
 
     let read_timeout = options.read_timeout;
@@ -155,7 +165,16 @@ pub fn ws_connect_blocking(
     on_event: &EventHandler,
     rx: &Receiver<WsMessage>,
 ) -> Result<()> {
-    let config = tungstenite::protocol::WebSocketConfig::from(options.clone());
+    let config = tungstenite::protocol::WebSocketConfig::default();
+    let max_incoming_frame_size = options.max_incoming_frame_size;
+    let max_frame_size = if max_incoming_frame_size == usize::MAX {
+        None
+    } else {
+        Some(max_incoming_frame_size)
+    };
+    
+    config.max_frame_size(max_frame_size);
+    // config.
     let max_redirects = 3; // tungstenite default
     let uri: tungstenite::http::Uri = url
         .parse()
@@ -193,10 +212,10 @@ pub fn ws_connect_blocking(
         match rx.try_recv() {
             Ok(outgoing_message) => {
                 let outgoing_message = match outgoing_message {
-                    WsMessage::Text(text) => tungstenite::protocol::Message::Text(text),
-                    WsMessage::Binary(data) => tungstenite::protocol::Message::Binary(data),
-                    WsMessage::Ping(data) => tungstenite::protocol::Message::Ping(data),
-                    WsMessage::Pong(data) => tungstenite::protocol::Message::Pong(data),
+                    WsMessage::Text(text) => tungstenite::protocol::Message::Text(text.into()),
+                    WsMessage::Binary(data) => tungstenite::protocol::Message::Binary(data.into()),
+                    WsMessage::Ping(data) => tungstenite::protocol::Message::Ping(data.into()),
+                    WsMessage::Pong(data) => tungstenite::protocol::Message::Pong(data.into()),
                     WsMessage::Unknown(_) => panic!("You cannot send WsMessage::Unknown"),
                 };
                 if let Err(err) = socket.send(outgoing_message) {
@@ -234,16 +253,16 @@ fn read_from_socket(
     let control = match socket.read() {
         Ok(incoming_msg) => match incoming_msg {
             tungstenite::protocol::Message::Text(text) => {
-                on_event(WsEvent::Message(WsMessage::Text(text)))
+                on_event(WsEvent::Message(WsMessage::Text(text.to_string())))
             }
             tungstenite::protocol::Message::Binary(data) => {
-                on_event(WsEvent::Message(WsMessage::Binary(data)))
+                on_event(WsEvent::Message(WsMessage::Binary(data.to_vec())))
             }
             tungstenite::protocol::Message::Ping(data) => {
-                on_event(WsEvent::Message(WsMessage::Ping(data)))
+                on_event(WsEvent::Message(WsMessage::Ping(data.to_vec())))
             }
             tungstenite::protocol::Message::Pong(data) => {
-                on_event(WsEvent::Message(WsMessage::Pong(data)))
+                on_event(WsEvent::Message(WsMessage::Pong(data.to_vec())))
             }
             tungstenite::protocol::Message::Close(close) => {
                 on_event(WsEvent::Closed);
