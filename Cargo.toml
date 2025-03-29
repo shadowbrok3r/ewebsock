@@ -11,7 +11,7 @@ members = ["ewebsock", "example_app", "echo_server"]
 
 
 [workspace.dependencies]
-ewebsock = { version = "0.9.2", path = "ewebsock", default-features = false }
+ewebsock = { version = "0.9.3", path = "ewebsock", default-features = false }
 
 async-stream = "0.3"
 document-features = "0.2"
